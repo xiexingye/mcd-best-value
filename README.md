@@ -103,6 +103,7 @@ mcd-best-value/
 ├── README.md                  # 本文件：项目介绍、安装、用例
 ├── CONTEST_DECLARATION.md     # 参赛声明（官方提供，内容不可修改）
 ├── MCP_INTEGRATION.md         # 麦当劳 MCP 集成说明
+├── mcp-config.example.json    # 脱敏后的 MCP 配置示例（仅环境变量占位符）
 ├── workbuddy.md               # WorkBuddy 开发对话上下文
 └── skill/                     # 技能源代码（可运行内容）
     ├── SKILL.md               # 技能主文件：工作流与规则
