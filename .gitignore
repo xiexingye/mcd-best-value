@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 生成产物
+mcd_board*.html
+mcd_query*.html
+candidates*.json
+*.log
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 环境变量与密钥（严禁提交）
+.env
+.env.*
+*.token
+*.key
+secrets.*
