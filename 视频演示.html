@@ -23,12 +23,14 @@
          transition:opacity .7s ease; pointer-events:none; padding:4% 6%}
   .scene.show{opacity:1}
 
-  /* 字幕条 */
-  #subtitle{position:absolute;left:0;right:0;bottom:5%;text-align:center;
+  /* 字幕条 —— B站风格：大字号 + 描边 + 半透明底 */
+  #subtitle{position:absolute;left:0;right:0;bottom:6%;text-align:center;
             pointer-events:none;z-index:100;transition:opacity .3s}
-  #subtitle span{display:inline-block;background:rgba(20,18,16,.82);color:#fff;
-                 font-size:1.5vw;line-height:1.5;padding:.6em 1.2em;border-radius:.5em;
-                 max-width:78%;font-weight:500}
+  #subtitle span{display:inline-block;background:rgba(0,0,0,.72);color:#fff;
+                 font-size:1.9vw;line-height:1.55;padding:.55em 1.3em;border-radius:.45em;
+                 max-width:80%;font-weight:600;letter-spacing:.01em;
+                 text-shadow:0 2px 6px rgba(0,0,0,.6);
+                 border:1px solid rgba(255,255,255,.14)}
 
   /* 进度条 */
   #progress{position:absolute;left:0;bottom:0;height:4px;background:var(--red);
@@ -285,20 +287,46 @@
   <div id="controls">
     <button id="btnPlay">⏸ 暂停</button>
     <button id="btnRestart">↻ 重播</button>
+    <button id="btnRec">⏺ 录屏模式(R)</button>
   </div>
 </div>
 
 <script>
 /* ======== 视频脚本（时间轴）======== */
+/* 每个场景可含多条字幕，按 [相对开始秒, 文本] 轮流显示，节奏更贴视频 */
 const TIMELINE = [
-  // [开始秒, 持续秒, 场景索引, 字幕]
-  [0,   6,  0, "每次点麦当劳，都在纠结点什么最划算？"],
-  [6,   7,  1, "套餐太多挑花眼，有券不知道怎么用，想吃又怕不划算。"],
-  [13,  7,  2, "麦门省钱助手，一张榜单直接帮你拍板。"],
-  [20,  11, 3, "实时拉取门店菜单和优惠券，用四维模型打分，标注适合人群和推荐程度。"],
-  [31,  11, 4, "还能生成交互查询页，拖预算滑块、点场景标签，榜单实时重排。"],
-  [42,  11, 5, "实时查询、套餐明细、人群标注、12点自动推送、优惠券优先、一键下单。"],
-  [53,  7,  6, "花更少的钱，吃到更值的那一顿。项目地址在简介，欢迎 star。"],
+  { start:0,  dur:6,  scene:0, subs:[
+    [0, "每次点麦当劳，都在纠结点什么最划算？"],
+  ]},
+  { start:6,  dur:7,  scene:1, subs:[
+    [0, "套餐太多挑花眼"],
+    [2.4, "有券却不知道怎么用"],
+    [4.6, "想吃又怕不划算"],
+  ]},
+  { start:13, dur:7,  scene:2, subs:[
+    [0, "麦门省钱助手"],
+    [1.8, "一张榜单，直接帮你拍板"],
+  ]},
+  { start:20, dur:11, scene:3, subs:[
+    [0, "实时拉取门店菜单和优惠券"],
+    [3.2, "用四维模型给每个套餐打分"],
+    [6.4, "标注适合人群与推荐程度"],
+  ]},
+  { start:31, dur:11, scene:4, subs:[
+    [0, "还能生成交互查询页"],
+    [2.6, "拖预算滑块，榜单实时重排"],
+    [5.6, "点场景标签，一秒切换视角"],
+    [8.2, "四种排序，详情展开"],
+  ]},
+  { start:42, dur:11, scene:5, subs:[
+    [0, "实时查询 · 套餐明细 · 人群标注"],
+    [3.0, "12 点自动推送 · 优惠券优先"],
+    [6.2, "还有一键下单"],
+  ]},
+  { start:53, dur:7,  scene:6, subs:[
+    [0, "花更少的钱，吃到更值的那一顿"],
+    [3.2, "项目已开源，欢迎 star ⭐"],
+  ]},
 ];
 
 const TOTAL = 60; // 总时长（秒）
@@ -313,21 +341,33 @@ let pausedAt = 0;
 let playing = true;
 let elapsed = 0;
 let lastScene = -1;
+let lastSub = "";
 let animTimers = [];
 
 /* 播放控制 */
 function setElapsed(sec){
   elapsed = sec;
-  const item = TIMELINE.find(x => sec >= x[0] && sec < x[0]+x[1]);
+  const item = TIMELINE.find(x => sec >= x.start && sec < x.start + x.dur);
   if(item){
-    const [start, dur, sceneIdx, text] = item;
-    if(sceneIdx !== lastScene){
+    if(item.scene !== lastScene){
       scenes.forEach(s=>s.classList.remove('show'));
-      scenes[sceneIdx].classList.add('show');
-      lastScene = sceneIdx;
-      triggerSceneAnim(sceneIdx);
+      scenes[item.scene].classList.add('show');
+      lastScene = item.scene;
+      triggerSceneAnim(item.scene);
     }
-    subText.textContent = text;
+    // 按时间轴挑选当前应显示的字幕
+    const local = sec - item.start;
+    let cur = "";
+    for(const [at, txt] of item.subs){
+      if(local >= at) cur = txt;
+    }
+    if(cur !== lastSub){
+      subText.textContent = cur;
+      // 换字幕时做一次淡入
+      subtitle.style.opacity = 0;
+      requestAnimationFrame(()=>{ subtitle.style.opacity = 1; });
+      lastSub = cur;
+    }
     subtitle.style.opacity = 1;
   } else {
     subtitle.style.opacity = 0;
@@ -386,15 +426,35 @@ document.getElementById('btnPlay').onclick = function(){
   }
 };
 document.getElementById('btnRestart').onclick = function(){
-  pausedAt = 0; t0 = performance.now(); lastScene = -1;
+  pausedAt = 0; t0 = performance.now(); lastScene = -1; lastSub = "";
   playing = true;
   document.getElementById('btnPlay').textContent = '⏸ 暂停';
   setElapsed(0);
 };
+document.getElementById('btnRec').onclick = function(){
+  recording = !recording;
+  document.getElementById('controls').style.display = recording ? 'none' : 'flex';
+  document.getElementById('progress').style.display = recording ? 'none' : 'block';
+};
 
-/* 空格键播放/暂停 */
+/* 快捷键：空格=播放/暂停；R=录制模式（隐藏控制条与进度条）；← → =前后切换场景 */
+let recording = false;
 document.addEventListener('keydown', e=>{
   if(e.code === 'Space'){ e.preventDefault(); document.getElementById('btnPlay').click(); }
+  if(e.key === 'r' || e.key === 'R'){
+    recording = !recording;
+    document.getElementById('controls').style.display = recording ? 'none' : 'flex';
+    document.getElementById('progress').style.display = recording ? 'none' : 'block';
+  }
+  if(e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
+    const dir = e.key === 'ArrowRight' ? 1 : -1;
+    let idx = TIMELINE.findIndex(x => elapsed >= x.start && elapsed < x.start + x.dur);
+    if(idx < 0) idx = 0;
+    idx = Math.max(0, Math.min(TIMELINE.length - 1, idx + dir));
+    const target = TIMELINE[idx].start;
+    pausedAt = target; t0 = performance.now(); lastScene = -1; lastSub = "";
+    setElapsed(target);
+  }
 });
 
 setElapsed(0);
