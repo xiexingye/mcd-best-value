@@ -287,43 +287,46 @@
   <div id="controls">
     <button id="btnPlay">⏸ 暂停</button>
     <button id="btnRestart">↻ 重播</button>
+    <button id="btnVoice">🔊 旁白开</button>
     <button id="btnRec">⏺ 录屏模式(R)</button>
   </div>
 </div>
 
 <script>
 /* ======== 视频脚本（时间轴）======== */
-/* 每个场景可含多条字幕，按 [相对开始秒, 文本] 轮流显示，节奏更贴视频 */
+/* 每个场景含：
+   - subs: 屏幕字幕（[相对秒, 文本]）
+   - say:  旁白（在场景开始后 delay 秒朗读），比字幕更口语连贯 */
 const TIMELINE = [
-  { start:0,  dur:6,  scene:0, subs:[
+  { start:0,  dur:6,  scene:0, say:[0, "每次点麦当劳，是不是都在纠结，今天吃什么才最划算？"], subs:[
     [0, "每次点麦当劳，都在纠结点什么最划算？"],
   ]},
-  { start:6,  dur:7,  scene:1, subs:[
+  { start:6,  dur:7,  scene:1, say:[0, "套餐太多挑花眼，优惠券有一堆，却不知道哪张能用、能省多少。"], subs:[
     [0, "套餐太多挑花眼"],
     [2.4, "有券却不知道怎么用"],
     [4.6, "想吃又怕不划算"],
   ]},
-  { start:13, dur:7,  scene:2, subs:[
+  { start:13, dur:7,  scene:2, say:[0, "麦门省钱助手，把这道题，直接算给你看。"], subs:[
     [0, "麦门省钱助手"],
     [1.8, "一张榜单，直接帮你拍板"],
   ]},
-  { start:20, dur:11, scene:3, subs:[
+  { start:20, dur:11, scene:3, say:[0.3, "它实时拉取门店菜单和优惠券，用四维模型给每个套餐打分，还标注适合人群和推荐程度。"], subs:[
     [0, "实时拉取门店菜单和优惠券"],
     [3.2, "用四维模型给每个套餐打分"],
     [6.4, "标注适合人群与推荐程度"],
   ]},
-  { start:31, dur:11, scene:4, subs:[
+  { start:31, dur:11, scene:4, say:[0.3, "还能生成交互查询页。拖一下预算滑块，点一下场景标签，最值的套餐立刻浮到最前面。"], subs:[
     [0, "还能生成交互查询页"],
     [2.6, "拖预算滑块，榜单实时重排"],
     [5.6, "点场景标签，一秒切换视角"],
     [8.2, "四种排序，详情展开"],
   ]},
-  { start:42, dur:11, scene:5, subs:[
+  { start:42, dur:11, scene:5, say:[0.3, "实时查询、套餐明细、人群标注，每天中午十二点自动推送，优惠券优先，还有一键下单。"], subs:[
     [0, "实时查询 · 套餐明细 · 人群标注"],
     [3.0, "12 点自动推送 · 优惠券优先"],
     [6.2, "还有一键下单"],
   ]},
-  { start:53, dur:7,  scene:6, subs:[
+  { start:53, dur:7,  scene:6, say:[0.3, "花更少的钱，吃到更值的那一顿。项目已经在 GitHub 开源，欢迎查看，也欢迎点个 star。"], subs:[
     [0, "花更少的钱，吃到更值的那一顿"],
     [3.2, "项目已开源，欢迎 star ⭐"],
   ]},
@@ -335,6 +338,55 @@ const scenes = [...document.querySelectorAll('.scene')];
 const subText = document.getElementById('subText');
 const progress = document.getElementById('progress');
 const subtitle = document.getElementById('subtitle');
+
+/* ======== 旁白引擎（Web Speech API）======== */
+let voiceReady = false;
+let zhVoice = null;
+let narrationOn = true;
+
+function pickVoice(){
+  if(!('speechSynthesis' in window)) return;
+  const voices = speechSynthesis.getVoices();
+  // 优先中文音色：zh-CN 女声（如 Xiaoxiao / Huihui / Tingting）
+  zhVoice = voices.find(v => /zh[-_]CN/i.test(v.lang) && /xiaoxiao|huihui|tingting|yaoyao|女/i.test(v.name))
+         || voices.find(v => /zh[-_]CN/i.test(v.lang))
+         || voices.find(v => /^zh/i.test(v.lang))
+         || null;
+  voiceReady = true;
+}
+if('speechSynthesis' in window){
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
+}
+
+let spokenScene = -1;
+function speakScene(idx, delaySec){
+  if(!narrationOn) return;
+  if(!('speechSynthesis' in window)) return;
+  const item = TIMELINE[idx];
+  if(!item || !item.say) return;
+  const doSpeak = ()=>{
+    // 用 say 文本；若没有则用该场景首条字幕
+    const text = item.say[1] || (item.subs[0] && item.subs[0][1]) || "";
+    if(!text) return;
+    try{
+      speechSynthesis.cancel();           // 打断上一条，避免叠音
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'zh-CN';
+      if(zhVoice) u.voice = zhVoice;
+      u.rate = 1.02;    // 语速，接近自然解说
+      u.pitch = 1.0;
+      u.volume = 1.0;
+      speechSynthesis.speak(u);
+    }catch(e){ /* 静默失败，不影响画面播放 */ }
+  };
+  const d = (item.say[0] || 0) * 1000;
+  animTimers.push(setTimeout(doSpeak, d));
+}
+
+function stopNarration(){
+  if('speechSynthesis' in window){ try{ speechSynthesis.cancel(); }catch(e){} }
+}
 
 let t0 = performance.now();
 let pausedAt = 0;
@@ -354,6 +406,8 @@ function setElapsed(sec){
       scenes[item.scene].classList.add('show');
       lastScene = item.scene;
       triggerSceneAnim(item.scene);
+      if(playing) speakScene(item.scene);
+      spokenScene = item.scene;
     }
     // 按时间轴挑选当前应显示的字幕
     const local = sec - item.start;
@@ -419,9 +473,13 @@ function loop(){
 document.getElementById('btnPlay').onclick = function(){
   if(playing){
     playing = false; pausedAt = elapsed;
+    stopNarration();
     this.textContent = '▶ 播放';
   } else {
     playing = true; t0 = performance.now();
+    // 继续时，把当前场景的旁白补读一次
+    const item = TIMELINE.find(x => elapsed >= x.start && elapsed < x.start + x.dur);
+    if(item) speakScene(item.scene, 0);
     this.textContent = '⏸ 暂停';
   }
 };
@@ -436,8 +494,13 @@ document.getElementById('btnRec').onclick = function(){
   document.getElementById('controls').style.display = recording ? 'none' : 'flex';
   document.getElementById('progress').style.display = recording ? 'none' : 'block';
 };
+document.getElementById('btnVoice').onclick = function(){
+  narrationOn = !narrationOn;
+  if(!narrationOn) stopNarration();
+  this.textContent = narrationOn ? '🔊 旁白开' : '🔇 旁白关';
+};
 
-/* 快捷键：空格=播放/暂停；R=录制模式（隐藏控制条与进度条）；← → =前后切换场景 */
+/* 快捷键：空格=播放/暂停；R=录制模式；← → =前后切换场景；V=旁白开关 */
 let recording = false;
 document.addEventListener('keydown', e=>{
   if(e.code === 'Space'){ e.preventDefault(); document.getElementById('btnPlay').click(); }
@@ -446,6 +509,7 @@ document.addEventListener('keydown', e=>{
     document.getElementById('controls').style.display = recording ? 'none' : 'flex';
     document.getElementById('progress').style.display = recording ? 'none' : 'block';
   }
+  if(e.key === 'v' || e.key === 'V'){ document.getElementById('btnVoice').click(); }
   if(e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
     const dir = e.key === 'ArrowRight' ? 1 : -1;
     let idx = TIMELINE.findIndex(x => elapsed >= x.start && elapsed < x.start + x.dur);
@@ -456,6 +520,17 @@ document.addEventListener('keydown', e=>{
     setElapsed(target);
   }
 });
+
+/* 首次点击页面后再启动旁白（浏览器要求用户交互后才能发声） */
+let started = false;
+function boot(){
+  if(started) return; started = true;
+  if('speechSynthesis' in window && !zhVoice) pickVoice();
+  setElapsed(0);
+  loop();
+}
+document.addEventListener('click', boot, { once:true });
+document.addEventListener('keydown', boot, { once:true });
 
 setElapsed(0);
 loop();
