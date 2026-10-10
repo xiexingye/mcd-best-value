@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>麦门省钱与性价比推荐助手 · 项目演示</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --red:#d92b2b; --orange:#e8762c; --gold:#c9a227; --gray:#7a8b99;
+    --bg:#f5f2ec; --card:#fff; --ink:#2b2b2b; --muted:#8a857c; --line:#eee9e0;
+    --dark:#141210;
+  }
+  html,body{height:100%;overflow:hidden}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
+       background:#111;color:var(--ink)}
+
+  /* 舞台：16:9 */
+  #stage{position:absolute;inset:0;margin:auto;width:100vw;height:56.25vw;
+         max-height:100vh;max-width:177.78vh;background:var(--bg);overflow:hidden}
+  .scene{position:absolute;inset:0;display:flex;flex-direction:column;
+         align-items:center;justify-content:center;opacity:0;
+         transition:opacity .7s ease; pointer-events:none; padding:4% 6%}
+  .scene.show{opacity:1}
+
+  /* 字幕条 */
+  #subtitle{position:absolute;left:0;right:0;bottom:5%;text-align:center;
+            pointer-events:none;z-index:100;transition:opacity .3s}
+  #subtitle span{display:inline-block;background:rgba(20,18,16,.82);color:#fff;
+                 font-size:1.5vw;line-height:1.5;padding:.6em 1.2em;border-radius:.5em;
+                 max-width:78%;font-weight:500}
+
+  /* 进度条 */
+  #progress{position:absolute;left:0;bottom:0;height:4px;background:var(--red);
+            width:0;z-index:110;transition:width .2s linear}
+
+  /* 播放控制 */
+  #controls{position:absolute;top:14px;right:16px;z-index:120;display:flex;gap:8px}
+  #controls button{background:rgba(20,18,16,.7);color:#fff;border:none;border-radius:8px;
+                   padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit}
+  #controls button:hover{background:rgba(217,43,43,.9)}
+
+  h1.big{font-size:4.5vw;line-height:1.25;text-align:center;letter-spacing:.02em}
+  h2.mid{font-size:3vw;line-height:1.3;text-align:center;margin-bottom:.6em}
+  .accent{color:var(--red)}
+  .sub{font-size:1.9vw;color:var(--muted);text-align:center;margin-top:.6em;line-height:1.5}
+
+  /* 品牌 logo 字 */
+  .brand{display:flex;align-items:center;gap:.5em;margin-bottom:.8em}
+  .brand .logo{width:3.2vw;height:3.2vw;background:var(--red);border-radius:50%;
+               display:flex;align-items:center;justify-content:center;color:#fff;
+               font-size:2vw;font-weight:800}
+  .brand .name{font-size:2.4vw;font-weight:800}
+
+  /* 痛点三连 */
+  .pains{display:flex;gap:2vw;margin-top:1em;flex-wrap:wrap;justify-content:center}
+  .pain{background:var(--card);border-radius:1em;padding:1.4em 1.8em;
+        box-shadow:0 4px 18px rgba(0,0,0,.07);min-width:16vw;text-align:center}
+  .pain .emoji{font-size:2.6vw}
+  .pain .t{font-size:1.5vw;font-weight:700;margin-top:.3em}
+  .pain .d{font-size:1.15vw;color:var(--muted);margin-top:.3em}
+
+  /* 榜单卡片 */
+  .board{width:100%;max-width:64vw;display:flex;flex-direction:column;gap:1vw}
+  .bcard{display:flex;background:var(--card);border-radius:1em;overflow:hidden;
+         box-shadow:0 4px 16px rgba(0,0,0,.08);border-left:.5vw solid var(--red);
+         opacity:0;transform:translateY(20px);transition:all .5s ease}
+  .bcard.in{opacity:1;transform:translateY(0)}
+  .bcard.g{border-left-color:var(--orange)} .bcard.y{border-left-color:var(--gold)}
+  .brank{flex:0 0 4.5vw;display:flex;align-items:center;justify-content:center;
+         font-size:2.4vw;color:#fff;background:var(--red)}
+  .bcard.g .brank{background:var(--orange)} .bcard.y .brank{background:var(--gold)}
+  .bbody{flex:1;padding:1em 1.4em}
+  .bhead{display:flex;justify-content:space-between;align-items:center}
+  .bhead .bt{font-size:1.7vw;font-weight:800}
+  .bhead .bs{font-size:1.5vw;color:var(--red);font-weight:700}
+  .bcomps{font-size:1.2vw;color:#555;margin-top:.4em}
+  .bfoot{display:flex;justify-content:space-between;margin-top:.5em;align-items:center}
+  .bprice{font-size:1.2vw;color:var(--muted)}
+  .bprice b{color:var(--red);font-size:1.5vw}
+  .bwho{font-size:1.15vw;color:var(--muted)}
+  .bstars{font-size:1.5vw;color:var(--red)}
+
+  /* 交互演示 */
+  .demo-win{width:70vw;max-width:70vw;background:var(--card);border-radius:1em;
+            overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.18)}
+  .demo-toolbar{display:flex;align-items:center;gap:.8em;padding:.8em 1.2em;
+                background:#f0ece5;border-bottom:1px solid var(--line)}
+  .dots{display:flex;gap:.4em}
+  .dots i{width:.9vw;height:.9vw;border-radius:50%;display:block}
+  .demo-title{font-size:1.1vw;color:var(--muted)}
+  .demo-body{padding:1.6em 2em}
+
+  /* 滑块演示 */
+  .slider-demo{margin:1em 0}
+  .slider-track{height:1.2vw;background:#e8e3d8;border-radius:.6vw;position:relative;overflow:hidden}
+  .slider-fill{height:100%;background:linear-gradient(90deg,var(--red),var(--orange));
+               border-radius:.6vw;width:100%;transition:width 1s ease}
+  .slider-val{font-size:1.4vw;color:var(--red);font-weight:800;margin-top:.5em;text-align:center}
+
+  /* 标签 */
+  .tagrow{display:flex;gap:.7em;flex-wrap:wrap;margin:.8em 0}
+  .tag{font-size:1.1vw;padding:.4em 1em;border-radius:1em;background:#f3f0ea;
+       color:#5c564d;transition:.3s}
+  .tag.on{background:var(--red);color:#fff}
+
+  /* 特性列表 */
+  .features{display:grid;grid-template-columns:1fr 1fr;gap:1.4vw 2.4vw;
+            width:100%;max-width:70vw;margin-top:1em}
+  .feature{display:flex;gap:1em;align-items:flex-start;
+           opacity:0;transform:translateX(-20px);transition:all .5s}
+  .feature.in{opacity:1;transform:translateX(0)}
+  .feature .ico{font-size:2.2vw;line-height:1}
+  .feature .ft{font-size:1.45vw;font-weight:700}
+  .feature .fd{font-size:1.1vw;color:var(--muted);margin-top:.15em;line-height:1.4}
+
+  /* 数据亮点 */
+  .stats{display:flex;gap:3vw;margin-top:1em;justify-content:center}
+  .stat{text-align:center}
+  .stat .num{font-size:4vw;font-weight:900;color:var(--red);line-height:1}
+  .stat .lbl{font-size:1.3vw;color:var(--muted);margin-top:.3em}
+
+  /* 结尾 */
+  .endbox{text-align:center}
+  .endbox .repo{font-size:1.5vw;color:var(--ink);background:var(--card);
+                padding:.8em 1.6em;border-radius:.8em;margin-top:1em;
+                box-shadow:0 4px 16px rgba(0,0,0,.08);display:inline-block}
+  .endbox .repo b{color:var(--red)}
+
+  .fade{opacity:0;animation:fadeIn .8s forwards}
+  @keyframes fadeIn{to{opacity:1}}
+  .rise{opacity:0;transform:translateY(28px);animation:riseIn .8s forwards}
+  @keyframes riseIn{to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 场景 1：片头 -->
+  <div class="scene" data-scene="0">
+    <div class="brand fade" style="animation-delay:.2s">
+      <div class="logo">M</div>
+      <div class="name">麦门省钱助手</div>
+    </div>
+    <h1 class="big rise" style="animation-delay:.5s">
+      每天中午<span class="accent">最值的那个套餐</span><br>帮你直接算出来
+    </h1>
+    <div class="sub fade" style="animation-delay:1s">
+      基于麦当劳官方 MCP · WorkBuddy 技能
+    </div>
+  </div>
+
+  <!-- 场景 2：痛点 -->
+  <div class="scene" data-scene="1">
+    <h2 class="mid rise">每次点麦当劳，是不是都这样？</h2>
+    <div class="pains">
+      <div class="pain rise" style="animation-delay:.3s">
+        <div class="emoji">🤔</div>
+        <div class="t">套餐太多挑花眼</div>
+        <div class="d">几十个套餐反复比价</div>
+      </div>
+      <div class="pain rise" style="animation-delay:.6s">
+        <div class="emoji">💸</div>
+        <div class="t">不知道哪些券能用</div>
+        <div class="d">有券却用错、白花钱</div>
+      </div>
+      <div class="pain rise" style="animation-delay:.9s">
+        <div class="emoji">🍔</div>
+        <div class="t">想吃又怕不划算</div>
+        <div class="d">减脂、管饱、预算…难兼顾</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场景 3：方案 -->
+  <div class="scene" data-scene="2">
+    <h2 class="mid rise">麦门省钱助手：一张榜单，直接拍板</h2>
+    <div class="sub rise" style="animation-delay:.4s">
+      实时拉取菜单与优惠券 → 四维模型打分 → 标注人群与推荐程度
+    </div>
+    <div class="stats fade" style="animation-delay:.8s">
+      <div class="stat"><div class="num">实时</div><div class="lbl">每次查询都拉官方接口</div></div>
+      <div class="stat"><div class="num">4 维</div><div class="lbl">饱腹·优惠·营养·场景</div></div>
+      <div class="stat"><div class="num">5 星</div><div class="lbl">推荐程度一目了然</div></div>
+    </div>
+  </div>
+
+  <!-- 场景 4：榜单演示 -->
+  <div class="scene" data-scene="3">
+    <h2 class="mid rise">今日性价比榜单</h2>
+    <div class="board">
+      <div class="bcard" data-card="0">
+        <div class="brank">🥇</div>
+        <div class="bbody">
+          <div class="bhead"><span class="bt">双层吉士汉堡 + 中薯条</span><span class="bs">8.7/10</span></div>
+          <div class="bcomps">🍔 双层吉士汉堡 ×1 ＋ 🍟 中薯条 ×1</div>
+          <div class="bfoot">
+            <span class="bprice">原价 ¥30 → 实付 <b>¥19</b>　省 ¥11</span>
+            <span class="bwho">学生党 · 管饱</span>
+            <span class="bstars">★★★★☆ 强推</span>
+          </div>
+        </div>
+      </div>
+      <div class="bcard g" data-card="1">
+        <div class="brank">🥈</div>
+        <div class="bbody">
+          <div class="bhead"><span class="bt">板烧鸡腿堡套餐</span><span class="bs">8.2/10</span></div>
+          <div class="bcomps">🍔 板烧鸡腿堡 ＋ 🍟 中薯条 ＋ 🥤 中可乐</div>
+          <div class="bfoot">
+            <span class="bprice">原价 ¥39 → 实付 <b>¥31</b>　省 ¥8</span>
+            <span class="bwho">上班族 · 常规正餐</span>
+            <span class="bstars">★★★★☆ 强推</span>
+          </div>
+        </div>
+      </div>
+      <div class="bcard y" data-card="2">
+        <div class="brank">🥉</div>
+        <div class="bbody">
+          <div class="bhead"><span class="bt">麦香鸡 + 玉米杯 + 无糖可乐</span><span class="bs">7.4/10</span></div>
+          <div class="bcomps">🍔 麦香鸡 ＋ 🌽 玉米杯 ＋ 🥤 无糖可乐</div>
+          <div class="bfoot">
+            <span class="bprice">原价 ¥32 → 实付 <b>¥25</b>　省 ¥7</span>
+            <span class="bwho">减脂 · 控卡</span>
+            <span class="bstars">★★★☆☆ 推荐</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场景 5：交互演示 -->
+  <div class="scene" data-scene="4">
+    <h2 class="mid rise">交互查询页：按你的预算和口味筛</h2>
+    <div class="demo-win rise" style="animation-delay:.4s">
+      <div class="demo-toolbar">
+        <div class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+        <div class="demo-title">麦门性价比查询</div>
+      </div>
+      <div class="demo-body">
+        <div style="font-size:1.15vw;color:var(--muted);margin-bottom:.4em">预算上限</div>
+        <div class="slider-demo">
+          <div class="slider-track"><div class="slider-fill" id="sliderFill"></div></div>
+          <div class="slider-val" id="sliderVal">¥ 不限</div>
+        </div>
+        <div style="font-size:1.15vw;color:var(--muted);margin:.8em 0 .3em">场景筛选</div>
+        <div class="tagrow" id="tagrow">
+          <span class="tag" data-tag="0">学生党</span>
+          <span class="tag" data-tag="1">上班族</span>
+          <span class="tag" data-tag="2">减脂</span>
+          <span class="tag" data-tag="3">双人</span>
+          <span class="tag" data-tag="4">下午茶</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场景 6：特性 -->
+  <div class="scene" data-scene="5">
+    <h2 class="mid rise">不只是比价，是把需求想清楚</h2>
+    <div class="features">
+      <div class="feature" data-feat="0"><span class="ico">🕐</span><div><div class="ft">实时查询</div><div class="fd">每次拉官方接口，价格与券都是当前时刻</div></div></div>
+      <div class="feature" data-feat="1"><span class="ico">🍔</span><div><div class="ft">套餐组成明细</div><div class="fd">主食/小食/饮料逐项列出，可替换项标注</div></div></div>
+      <div class="feature" data-feat="2"><span class="ico">👥</span><div><div class="ft">适合人群标注</div><div class="fd">学生党、上班族、减脂、双人各有推荐</div></div></div>
+      <div class="feature" data-feat="3"><span class="ico">⏰</span><div><div class="ft">每天 12 点自动推</div><div class="fd">到点自动送榜单，省得自己开口</div></div></div>
+      <div class="feature" data-feat="4"><span class="ico">🎟️</span><div><div class="ft">优惠券优先</div><div class="fd">已持有券 + 可领券一起算，省多少看得见</div></div></div>
+      <div class="feature" data-feat="5"><span class="ico">🛒</span><div><div class="ft">一键下单</div><div class="fd">推荐直接衔接下单，缩短决策路径</div></div></div>
+    </div>
+  </div>
+
+  <!-- 场景 7：结尾 -->
+  <div class="scene" data-scene="6">
+    <div class="endbox">
+      <h1 class="big rise">花更少的钱<br><span class="accent">吃到更值的那一顿</span></h1>
+      <div class="repo fade" style="animation-delay:.6s">
+        🔗 github.com/<b>xiexingye/mcd-best-value</b>
+      </div>
+      <div class="sub fade" style="animation-delay:1s;margin-top:1em">
+        麦当劳程序员创意开发大赛参赛作品 · 基于 MCP + WorkBuddy
+      </div>
+    </div>
+  </div>
+
+  <div id="subtitle"><span id="subText"></span></div>
+  <div id="progress"></div>
+  <div id="controls">
+    <button id="btnPlay">⏸ 暂停</button>
+    <button id="btnRestart">↻ 重播</button>
+  </div>
+</div>
+
+<script>
+/* ======== 视频脚本（时间轴）======== */
+const TIMELINE = [
+  // [开始秒, 持续秒, 场景索引, 字幕]
+  [0,   6,  0, "每次点麦当劳，都在纠结点什么最划算？"],
+  [6,   7,  1, "套餐太多挑花眼，有券不知道怎么用，想吃又怕不划算。"],
+  [13,  7,  2, "麦门省钱助手，一张榜单直接帮你拍板。"],
+  [20,  11, 3, "实时拉取门店菜单和优惠券，用四维模型打分，标注适合人群和推荐程度。"],
+  [31,  11, 4, "还能生成交互查询页，拖预算滑块、点场景标签，榜单实时重排。"],
+  [42,  11, 5, "实时查询、套餐明细、人群标注、12点自动推送、优惠券优先、一键下单。"],
+  [53,  7,  6, "花更少的钱，吃到更值的那一顿。项目地址在简介，欢迎 star。"],
+];
+
+const TOTAL = 60; // 总时长（秒）
+
+const scenes = [...document.querySelectorAll('.scene')];
+const subText = document.getElementById('subText');
+const progress = document.getElementById('progress');
+const subtitle = document.getElementById('subtitle');
+
+let t0 = performance.now();
+let pausedAt = 0;
+let playing = true;
+let elapsed = 0;
+let lastScene = -1;
+let animTimers = [];
+
+/* 播放控制 */
+function setElapsed(sec){
+  elapsed = sec;
+  const item = TIMELINE.find(x => sec >= x[0] && sec < x[0]+x[1]);
+  if(item){
+    const [start, dur, sceneIdx, text] = item;
+    if(sceneIdx !== lastScene){
+      scenes.forEach(s=>s.classList.remove('show'));
+      scenes[sceneIdx].classList.add('show');
+      lastScene = sceneIdx;
+      triggerSceneAnim(sceneIdx);
+    }
+    subText.textContent = text;
+    subtitle.style.opacity = 1;
+  } else {
+    subtitle.style.opacity = 0;
+  }
+  progress.style.width = Math.min(100, sec/TOTAL*100) + '%';
+}
+
+function triggerSceneAnim(idx){
+  animTimers.forEach(clearTimeout); animTimers = [];
+  const sc = scenes[idx];
+  // 重置内部动画元素
+  sc.querySelectorAll('.bcard').forEach(c=>c.classList.remove('in'));
+  sc.querySelectorAll('.feature').forEach(f=>f.classList.remove('in'));
+  const sf = sc.querySelector('#sliderFill'); if(sf) sf.style.width='100%';
+  const sv = sc.querySelector('#sliderVal'); if(sv) sv.textContent='¥ 不限';
+  sc.querySelectorAll('.tag').forEach(t=>t.classList.remove('on'));
+
+  if(idx===3){ // 榜单卡片逐个入场
+    sc.querySelectorAll('.bcard').forEach((c,i)=>
+      animTimers.push(setTimeout(()=>c.classList.add('in'), 400+i*700)));
+  }
+  if(idx===4){ // 交互演示
+    animTimers.push(setTimeout(()=>{ if(sf) sf.style.width='45%'; if(sv) sv.textContent='¥ 20'; },600));
+    animTimers.push(setTimeout(()=>{ if(sf) sf.style.width='32%'; if(sv) sv.textContent='¥ 15'; },2000));
+    animTimers.push(setTimeout(()=>{ const tg=sc.querySelector('[data-tag="0"]'); if(tg) tg.classList.add('on'); },3200));
+    animTimers.push(setTimeout(()=>{ const tg=sc.querySelector('[data-tag="2"]'); if(tg) tg.classList.add('on'); },4200));
+  }
+  if(idx===5){ // 特性逐个入场
+    sc.querySelectorAll('.feature').forEach((f,i)=>
+      animTimers.push(setTimeout(()=>f.classList.add('in'), 300+i*350)));
+  }
+}
+
+function loop(){
+  if(playing){
+    const now = performance.now();
+    const sec = pausedAt + (now - t0)/1000;
+    if(sec >= TOTAL){
+      // 循环播放
+      pausedAt = 0; t0 = now; lastScene = -1;
+      setElapsed(0);
+    } else {
+      setElapsed(sec);
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+document.getElementById('btnPlay').onclick = function(){
+  if(playing){
+    playing = false; pausedAt = elapsed;
+    this.textContent = '▶ 播放';
+  } else {
+    playing = true; t0 = performance.now();
+    this.textContent = '⏸ 暂停';
+  }
+};
+document.getElementById('btnRestart').onclick = function(){
+  pausedAt = 0; t0 = performance.now(); lastScene = -1;
+  playing = true;
+  document.getElementById('btnPlay').textContent = '⏸ 暂停';
+  setElapsed(0);
+};
+
+/* 空格键播放/暂停 */
+document.addEventListener('keydown', e=>{
+  if(e.code === 'Space'){ e.preventDefault(); document.getElementById('btnPlay').click(); }
+});
+
+setElapsed(0);
+loop();
+</script>
+</body>
+</html>
