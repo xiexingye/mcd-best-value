@@ -12,6 +12,13 @@ mcd_query*.html
 candidates*.json
 *.log
 
+# 旁白音频（体积大且可能涉及版权，本地放即可，不入库）
+audio/*.mp3
+audio/*.m4a
+audio/*.wav
+audio/*.aac
+!audio/README.md
+
 # 系统
 .DS_Store
 Thumbs.db
