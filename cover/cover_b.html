@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>封面 B · 红底版</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1146px;height:717px;overflow:hidden}
+  body{font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;
+       background:#DA291C;position:relative}
+
+  /* 右上装饰：深红大圆 + 白色「省」字 */
+  .deco-r{position:absolute;right:-150px;top:-170px;width:520px;height:520px;border-radius:50%;
+          background:#B91E14;display:flex;align-items:center;justify-content:center}
+  .deco-r span{font-size:238px;font-weight:900;color:#fff;line-height:1;
+               transform:translate(-72px,86px)}
+  /* 黄色品牌点缀 */
+  .deco-y{position:absolute;right:118px;top:330px;width:92px;height:92px;border-radius:50%;
+          background:#FFC72C}
+
+  /* 左上品牌胶囊（反白） */
+  .badge{position:absolute;left:64px;top:46px;background:#fff;color:#DA291C;
+         font-size:31px;font-weight:700;padding:15px 30px 16px;border-radius:999px;
+         letter-spacing:1px}
+
+  /* 主标题 */
+  .l1{position:absolute;left:60px;top:148px;font-size:106px;font-weight:900;
+      color:#ffffff;letter-spacing:2px;line-height:1.1;white-space:nowrap}
+  .l2{position:absolute;left:58px;top:264px;font-size:148px;font-weight:900;
+      color:#FFC72C;letter-spacing:2px;line-height:1.05;white-space:nowrap}
+
+  /* 榜单卡片 */
+  .card{position:absolute;left:64px;top:452px;width:1018px;height:196px;background:#fff;
+        border-radius:26px;box-shadow:0 18px 50px rgba(0,0,0,.28)}
+  .top1{position:absolute;left:34px;top:40px;width:116px;height:116px;border-radius:24px;
+        background:#DA291C;color:#fff;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;line-height:1}
+  .top1 b{font-size:29px;letter-spacing:2px;font-weight:700}
+  .top1 i{font-size:56px;font-style:normal;font-weight:900;margin-top:2px}
+  .meal{position:absolute;left:184px;top:42px;font-size:43px;font-weight:700;
+        color:#171717;letter-spacing:1px}
+  .meal-sub{position:absolute;left:186px;top:110px;font-size:25px;color:#909090;letter-spacing:.5px}
+  .price{position:absolute;right:40px;top:26px;font-size:58px;font-weight:900;
+         color:#DA291C;letter-spacing:1px;text-align:right}
+  .score{position:absolute;right:40px;top:114px;display:flex;align-items:center;
+         gap:12px;font-size:29px;color:#333}
+  .score b{font-size:35px;color:#171717}
+  .stars{color:#DA291C;font-size:30px;letter-spacing:2px}
+  .pill{background:#DA291C;color:#fff;font-size:24px;font-weight:700;
+        padding:6px 18px 7px;border-radius:999px;letter-spacing:1px}
+
+  /* 底部说明 */
+  .foot{position:absolute;left:64px;top:676px;font-size:27px;color:rgba(255,255,255,.8);letter-spacing:1px}
+</style>
+</head>
+<body>
+  <div class="deco-r"><span>省</span></div>
+  <div class="deco-y"></div>
+
+  <div class="badge">🍔 麦门省钱助手</div>
+
+  <div class="l1">今天吃啥</div>
+  <div class="l2">最划算？</div>
+
+  <div class="card">
+    <div class="top1"><b>TOP</b><i>1</i></div>
+    <div class="meal">双层吉士汉堡 + 中薯条</div>
+    <div class="meal-sub">今日性价比榜 · 第 1 名</div>
+    <div class="price">¥21.5</div>
+    <div class="score">
+      <b>8.7</b><span>分</span><span class="stars">★★★★☆</span>
+      <span class="pill">强推</span>
+    </div>
+  </div>
+
+  <div class="foot">实时菜单 · 四维打分 · 每天 12 点自动推送</div>
+</body>
+</html>
