@@ -35,3 +35,7 @@ desktop.ini
 *.token
 *.key
 secrets.*
+
+# 视频渲染产物（体积大，本地生成即可）
+render/_frames/
+*.mp4

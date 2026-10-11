@@ -306,43 +306,44 @@
 /* ======== 视频脚本（时间轴）======== */
 /* 每个场景含：
    - subs: 屏幕字幕（[相对秒, 文本]）
-   - say:  旁白（在场景开始后 delay 秒朗读），比字幕更口语连贯 */
+   - say:  旁白（在场景开始后 delay 秒朗读），比字幕更口语连贯
+   时间轴与 audio/narration.mp3（44.35s）严格对齐，边界取静音中点 */
 const TIMELINE = [
-  { start:0,  dur:6,  scene:0, say:[0, "每次点麦当劳，是不是都在纠结，今天吃什么才最划算？"], subs:[
+  { start:0,     dur:4.55, scene:0, say:[0, "每次点麦当劳，是不是都在纠结，今天吃什么才最划算？"], subs:[
     [0, "每次点麦当劳，都在纠结点什么最划算？"],
   ]},
-  { start:6,  dur:7,  scene:1, say:[0, "套餐太多挑花眼，优惠券有一堆，却不知道哪张能用、能省多少。"], subs:[
+  { start:4.55,  dur:5.53, scene:1, say:[0, "套餐太多挑花眼，优惠券有一堆，却不知道哪张能用、能省多少。"], subs:[
     [0, "套餐太多挑花眼"],
-    [2.4, "有券却不知道怎么用"],
-    [4.6, "想吃又怕不划算"],
+    [1.9, "有券却不知道怎么用"],
+    [3.7, "想吃又怕不划算"],
   ]},
-  { start:13, dur:7,  scene:2, say:[0, "麦门省钱助手，把这道题，直接算给你看。"], subs:[
+  { start:10.08, dur:3.69, scene:2, say:[0, "麦门省钱助手，把这道题，直接算给你看。"], subs:[
     [0, "麦门省钱助手"],
-    [1.8, "一张榜单，直接帮你拍板"],
+    [1.7, "一张榜单，直接帮你拍板"],
   ]},
-  { start:20, dur:11, scene:3, say:[0.3, "它实时拉取门店菜单和优惠券，用四维模型给每个套餐打分，还标注适合人群和推荐程度。"], subs:[
+  { start:13.77, dur:7.64, scene:3, say:[0, "它实时拉取门店菜单和优惠券，用四维模型给每个套餐打分，还标注适合人群和推荐程度。"], subs:[
     [0, "实时拉取门店菜单和优惠券"],
-    [3.2, "用四维模型给每个套餐打分"],
-    [6.4, "标注适合人群与推荐程度"],
+    [2.5, "用四维模型给每个套餐打分"],
+    [5.0, "标注适合人群与推荐程度"],
   ]},
-  { start:31, dur:11, scene:4, say:[0.3, "还能生成交互查询页。拖一下预算滑块，点一下场景标签，最值的套餐立刻浮到最前面。"], subs:[
+  { start:21.41, dur:7.68, scene:4, say:[0, "还能生成交互查询页。拖一下预算滑块，点一下场景标签，最值的套餐立刻浮到最前面。"], subs:[
     [0, "还能生成交互查询页"],
-    [2.6, "拖预算滑块，榜单实时重排"],
-    [5.6, "点场景标签，一秒切换视角"],
-    [8.2, "四种排序，详情展开"],
+    [1.9, "拖预算滑块，榜单实时重排"],
+    [3.8, "点场景标签，一秒切换视角"],
+    [5.8, "四种排序，详情展开"],
   ]},
-  { start:42, dur:11, scene:5, say:[0.3, "实时查询、套餐明细、人群标注，每天中午十二点自动推送，优惠券优先，还有一键下单。"], subs:[
+  { start:29.09, dur:7.30, scene:5, say:[0, "实时查询、套餐明细、人群标注，每天中午十二点自动推送，优惠券优先，还有一键下单。"], subs:[
     [0, "实时查询 · 套餐明细 · 人群标注"],
-    [3.0, "12 点自动推送 · 优惠券优先"],
-    [6.2, "还有一键下单"],
+    [2.4, "12 点自动推送 · 优惠券优先"],
+    [4.9, "还有一键下单"],
   ]},
-  { start:53, dur:7,  scene:6, say:[0.3, "花更少的钱，吃到更值的那一顿。项目已经在 GitHub 开源，欢迎查看，也欢迎点个 star。"], subs:[
+  { start:36.39, dur:7.91, scene:6, say:[0, "花更少的钱，吃到更值的那一顿。项目已经在 GitHub 开源，欢迎查看，也欢迎点个 star。"], subs:[
     [0, "花更少的钱，吃到更值的那一顿"],
     [3.2, "项目已开源，欢迎 star ⭐"],
   ]},
 ];
 
-const TOTAL = 60; // 总时长（秒）
+const TOTAL = 44.30; // 总时长（秒），与 audio/narration.mp3 同步
 
 const scenes = [...document.querySelectorAll('.scene')];
 const subText = document.getElementById('subText');
@@ -372,10 +373,10 @@ if('speechSynthesis' in window){
 let spokenScene = -1;
 
 /* ---- 外接音频轨（曼波音色 / 自行配音）----
-   两种放法，页面自动识别，优先整段：
-   1) audio/narration.mp3          整段旁白，按时间轴自动定位
-   2) audio/1.mp3 … audio/7.mp3    分镜音频，按镜头顺序播放（可多几个文件，多余自动忽略）
-*/
+   两种放法，页面自动识别，优先分镜（音画天然同步）：
+   1) audio/1.mp3 … audio/7.mp3    分镜音频，每段对应一个镜头，最精确
+   2) audio/narration.mp3          整段旁白，按时间轴 seek 定位（有累积误差）
+   注意：整段音频长度必须与视频时间轴一致，否则会不同步 */
 const AUDIO_SEQ = [
   { full:'audio/narration.mp3', fullAlt:['audio/narration.m4a','audio/narration.wav'] },
   { parts:['audio/1.mp3','audio/2.mp3','audio/3.mp3','audio/4.mp3','audio/5.mp3','audio/6.mp3','audio/7.mp3'],
@@ -384,7 +385,6 @@ const AUDIO_SEQ = [
 let audioMode = 'tts';      // 'tts' | 'seq' | 'full'
 let seqEls = [];            // 分镜音频元素
 let fullEl = null;          // 整段音频元素
-let audioOffsets = [];      // 分镜音频：每段在整段旁白里的起始秒（若音频时长>镜头时长则自动压缩）
 
 function tryLoad(src, onok, onfail){
   const a = new Audio();
@@ -396,32 +396,34 @@ function tryLoad(src, onok, onfail){
   a.load();
 }
 
-/* 先探测整段音频，再探测分镜音频；都没有就退回系统合成音 */
+/* 探测顺序：分镜音频（最精确，天然同步）→ 整段音频（按起始秒 seek）→ 系统合成音 */
 function detectAudio(){
-  const [seqCfg] = AUDIO_SEQ.slice(1);
   const fullCfg = AUDIO_SEQ[0];
+  const seqCfg = AUDIO_SEQ[1];
+
   const tryFull = (list, i)=>{
-    if(i >= list.length){
-      // 整段没有 → 试分镜
-      tryParts(seqCfg.parts.concat(seqCfg.partsAlt), 0, []);
+    if(i >= list.length){ audioMode = 'tts'; return; }
+    tryLoad(list[i],
+      a=>{ fullEl = a; seqEls = []; audioMode = 'full'; markAudioOk('整段音频'); },
+      ()=>tryFull(list, i+1));
+  };
+
+  // 必须 7 段齐全才采用分镜模式，缺一段就退回整段
+  const tryParts = (i, acc)=>{
+    if(i >= TIMELINE.length){
+      seqEls = acc; fullEl = null; audioMode = 'seq';
+      markAudioOk('分镜音频 ×' + acc.length);
       return;
     }
-    tryLoad(list[i], a=>{ fullEl = a; audioMode = 'full'; markAudioOk('整段音频'); },
-            ()=>tryFull(list, i+1));
-  };
-  const tryParts = (list, i, acc)=>{
-    const target = TIMELINE.length;
-    if(i >= target){ // 只取前 N 个（与镜头数一致）
-      seqEls = acc; audioMode = 'seq'; markAudioOk('分镜音频 ×' + acc.length); return;
-    }
-    const cand = [list[i], seqCfg.partsAlt[i]].filter(Boolean);
+    const cand = [seqCfg.parts[i], seqCfg.partsAlt[i]].filter(Boolean);
     const walk = (j)=>{
-      if(j >= cand.length){ audioMode = 'tts'; return; }
-      tryLoad(cand[j], a=>{ acc.push(a); tryParts(list, i+1, acc); }, ()=>walk(j+1));
+      if(j >= cand.length){ tryFull([fullCfg.full].concat(fullCfg.fullAlt), 0); return; }
+      tryLoad(cand[j], a=>{ acc.push(a); tryParts(i+1, acc); }, ()=>walk(j+1));
     };
     walk(0);
   };
-  tryFull([fullCfg.full].concat(fullCfg.fullAlt), 0);
+
+  tryParts(0, []);
 }
 
 function markAudioOk(label){

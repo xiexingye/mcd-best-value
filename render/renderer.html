@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>渲染器</title>
+<style>
+  html,body{margin:0;padding:0;background:#000;overflow:hidden}
+  canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="cv" width="1920" height="1080"></canvas>
+<script>
+/* =========================================================
+   麦门省钱助手 · 演示片逐帧渲染器
+   用途：把 7 个镜头绘制到 canvas，供外部逐帧抓取编码成 MP4
+   暴露接口：window.renderFrame(tSeconds) —— 绘制第 t 秒的画面
+   ========================================================= */
+
+const W = 1920, H = 1080;
+const cv = document.getElementById('cv');
+const g = cv.getContext('2d');
+
+/* ---------- 主题色（与网页一致）---------- */
+const C = {
+  red:'#d92b2b', orange:'#e8762c', gold:'#c9a227', gray:'#7a8b99',
+  bg:'#f5f2ec', card:'#ffffff', ink:'#2b2b2b', muted:'#8a857c', line:'#eee9e0',
+  dark:'#141210', white:'#ffffff', sub:'#555555'
+};
+
+/* ---------- 字体 ---------- */
+const FT = '"Microsoft YaHei","PingFang SC","Heiti SC",sans-serif';
+const FTB = '"Microsoft YaHei","PingFang SC","Heiti SC",sans-serif';
+function font(size, bold){ return (bold?'bold ':'') + size + 'px ' + FT; }
+
+/* ---------- 缓动 ---------- */
+const easeOut = t => 1 - Math.pow(1 - Math.min(1,Math.max(0,t)), 3);
+const easeInOut = t => { t=Math.min(1,Math.max(0,t)); return t<.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; };
+function clamp01(t){ return Math.min(1, Math.max(0, t)); }
+
+/* ---------- 基础绘制工具 ---------- */
+function roundRect(x,y,w,h,r,fill){
+  g.beginPath();
+  g.moveTo(x+r,y);
+  g.arcTo(x+w,y,x+w,y+h,r);
+  g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r);
+  g.arcTo(x,y,x+w,y,r);
+  g.closePath();
+  if(fill){ g.fillStyle = fill; g.fill(); }
+}
+function shadowOn(blur, dy, color){
+  g.shadowBlur = blur; g.shadowOffsetY = dy; g.shadowColor = color || 'rgba(0,0,0,.10)';
+}
+function shadowOff(){ g.shadowBlur = 0; g.shadowOffsetY = 0; g.shadowColor='transparent'; }
+
+/* 文本：支持居中、自动换行 */
+function text(str, x, y, opt){
+  opt = opt || {};
+  g.save();
+  g.font = font(opt.size||32, opt.bold);
+  g.fillStyle = opt.color || C.ink;
+  g.textAlign = opt.align || 'left';
+  g.textBaseline = opt.base || 'alphabetic';
+  if(opt.stroke){ g.lineWidth = opt.strokeW||6; g.strokeStyle = opt.stroke; g.lineJoin='round'; g.strokeText(str,x,y); }
+  g.fillText(str, x, y);
+  g.restore();
+}
+function wrapText(str, x, y, maxW, opt){
+  opt = opt || {};
+  g.save();
+  g.font = font(opt.size||32, opt.bold);
+  const words = str.split('');
+  const lines = [];
+  let cur = '';
+  for(const ch of words){
+    const test = cur + ch;
+    if(g.measureText(test).width > maxW && cur){ lines.push(cur); cur = ch; }
+    else cur = test;
+  }
+  if(cur) lines.push(cur);
+  g.restore();
+  const lh = (opt.size||32) * (opt.lh||1.35);
+  const startY = y - (lines.length-1)*lh/2;
+  lines.forEach((ln,i)=> text(ln, x, startY + i*lh, opt));
+  return lines.length;
+}
+
+/* ---------- 背景 ---------- */
+function drawBG(){
+  g.fillStyle = C.bg;
+  g.fillRect(0,0,W,H);
+  // 淡淡的光晕，避免纯色发闷
+  const rg = g.createRadialGradient(W*0.5, H*0.42, 60, W*0.5, H*0.42, W*0.62);
+  rg.addColorStop(0, 'rgba(255,255,255,.75)');
+  rg.addColorStop(1, 'rgba(245,242,236,0)');
+  g.fillStyle = rg; g.fillRect(0,0,W,H);
+}
+
+/* ---------- 字幕条（B站风格）---------- */
+function drawSubtitle(txt){
+  if(!txt) return;
+  g.save();
+  g.font = font(38, true);
+  const padX = 42, padY = 26;
+  const tw = g.measureText(txt).width;
+  const bw = tw + padX*2;
+  const bh = 38 + padY*2 - 12;
+  const bx = (W - bw)/2;
+  const by = H - 118 - bh/2;
+  // 半透明底
+  roundRect(bx, by, bw, bh, 16, 'rgba(0,0,0,.72)');
+  // 描边
+  g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 2;
+  roundRect(bx, by, bw, bh, 16, null); g.stroke();
+  // 文字
+  g.shadowBlur = 12; g.shadowColor='rgba(0,0,0,.65)'; g.shadowOffsetY=3;
+  text(txt, W/2, by + bh/2 + 13, {size:38, bold:true, color:'#fff', align:'center'});
+  g.restore();
+}
+
+/* ---------- 进度条 ---------- */
+function drawProgress(t, total){
+  g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(0, H-6, W, 6);
+  g.fillStyle = C.red; g.fillRect(0, H-6, W * clamp01(t/total), 6);
+}
+
+/* =========================================================
+   镜头 1：开场提问  (0–6s)
+   ========================================================= */
+function scene0(t){
+  const p = clamp01(t/0.9);
+  // 品牌标
+  g.save();
+  g.globalAlpha = easeOut(p);
+  const logoR = 48;
+  const lx = W/2 - 300, ly = 300;
+  g.beginPath(); g.arc(lx, ly, logoR, 0, Math.PI*2); g.fillStyle = C.red; g.fill();
+  text('M', lx, ly+22, {size:66, bold:true, color:'#fff', align:'center'});
+  text('麦门省钱助手', lx+78, ly+20, {size:58, bold:true, color:C.ink});
+  g.restore();
+
+  // 主标题
+  const p2 = clamp01((t-0.25)/1.0);
+  g.save(); g.globalAlpha = easeOut(p2);
+  const ty = 560 + (1-easeOut(p2))*40;
+  wrapText('每次点麦当劳', W/2, ty, 1300, {size:112, bold:true, color:C.ink, align:'center'});
+  wrapText('都在纠结吃什么最划算？', W/2, ty+170, 1400, {size:92, bold:true, color:C.ink, align:'center'});
+  g.restore();
+
+  // 三个问号装饰
+  const p3 = clamp01((t-1.4)/0.8);
+  g.save(); g.globalAlpha = easeOut(p3)*0.85;
+  ['🤔','💸','🍟'].forEach((e,i)=>{
+    text(e, W/2 - 220 + i*220, 800, {size:70, align:'center'});
+  });
+  g.restore();
+}
+
+/* =========================================================
+   镜头 2：三个痛点  (6–13s)
+   ========================================================= */
+function scene1(t){
+  wrapText('点麦当劳的三个难题', W/2, 210, 1500, {size:76, bold:true, color:C.ink, align:'center'});
+  const items = [
+    ['😵‍💫','套餐太多','挑花眼，选不出来'],
+    ['🎫','券有一堆','不知道哪张能用'],
+    ['❓','想吃又怕','到底划不划算'],
+  ];
+  const cardW = 460, cardH = 430, gap = 60;
+  const totalW = cardW*3 + gap*2;
+  const sx = (W - totalW)/2;
+  items.forEach((it, i)=>{
+    const p = clamp01((t - 0.35 - i*0.35)/0.65);
+    if(p <= 0) return;
+    const e = easeOut(p);
+    const x = sx + i*(cardW+gap);
+    const y = 330 + (1-e)*46;
+    g.save(); g.globalAlpha = e;
+    shadowOn(30, 10, 'rgba(0,0,0,.09)');
+    roundRect(x, y, cardW, cardH, 28, C.card);
+    shadowOff();
+    text(it[0], x+cardW/2, y+150, {size:104, align:'center'});
+    text(it[1], x+cardW/2, y+262, {size:56, bold:true, color:C.ink, align:'center'});
+    wrapText(it[2], x+cardW/2, y+336, cardW-80, {size:34, color:C.muted, align:'center'});
+    g.restore();
+  });
+  // 底部收束
+  const p = clamp01((t-1.9)/0.7);
+  if(p>0){
+    g.save(); g.globalAlpha = easeOut(p);
+    text('一张榜单，直接帮你拍板', W/2, 845, {size:52, bold:true, color:C.red, align:'center'});
+    g.restore();
+  }
+}
+
+/* =========================================================
+   镜头 3：产品亮相  (13–20s)
+   ========================================================= */
+function scene2(t){
+  const p = clamp01((t-0.2)/0.85);
+  const e = easeOut(p);
+  g.save(); g.globalAlpha = e;
+
+  // 大红底圆 + 招牌
+  g.beginPath(); g.arc(W/2, 360, 160, 0, Math.PI*2); g.fillStyle = C.red; g.fill();
+  text('M', W/2, 360+64, {size:222, bold:true, color:'#fff', align:'center'});
+
+  // 主标题
+  wrapText('麦门省钱与性价比', W/2, 680, 1500, {size:92, bold:true, color:C.ink, align:'center'});
+  wrapText('推荐助手', W/2, 782, 1500, {size:92, bold:true, color:C.ink, align:'center'});
+  g.restore();
+
+  // 副标
+  const p2 = clamp01((t-1.1)/0.8);
+  if(p2>0){
+    g.save(); g.globalAlpha = easeOut(p2);
+    text('实时拉取 · 四维打分 · 人群标注', W/2, 880, {size:44, color:C.red, bold:true, align:'center'});
+    g.restore();
+  }
+}
+
+/* =========================================================
+   镜头 4：评分榜单  (20–31s)
+   ========================================================= */
+const BOARD = [
+  ['1','双层吉士汉堡 + 中薯条','¥21.5','8.7','★★★★☆','强推',  C.red,    '饱腹 9.2 · 优惠 8.4 · 营养 8.0'],
+  ['2','板烧鸡腿堡中套餐','¥25.0','8.3','★★★★☆','推荐',    C.orange, '饱腹 8.6 · 优惠 8.0 · 营养 8.1'],
+  ['3','麦香鱼中套餐','¥22.0','7.6','★★★☆☆','尚可',       C.gold,   '饱腹 7.2 · 优惠 7.8 · 营养 7.6'],
+];
+function scene3(t){
+  wrapText('今日性价比榜单', W/2, 175, 1500, {size:72, bold:true, color:C.ink, align:'center'});
+  text('四维模型：饱腹 40% + 优惠 30% + 营养 20% + 场景 10%', W/2, 248,
+       {size:34, color:C.muted, align:'center'});
+
+  const cardW = 1280, cardH = 190, gap = 32;
+  const sx = (W-cardW)/2;
+  BOARD.forEach((b, i)=>{
+    const p = clamp01((t - 0.4 - i*0.7)/0.7);
+    if(p <= 0) return;
+    const e = easeOut(p);
+    const y = 320 + i*(cardH+gap) + (1-e)*50;
+    g.save(); g.globalAlpha = e;
+
+    shadowOn(26, 8, 'rgba(0,0,0,.10)');
+    roundRect(sx, y, cardW, cardH, 22, C.card);
+    shadowOff();
+
+    // 左侧色条
+    g.save();
+    roundRect(sx, y, 14, cardH, 7, b[6]);
+    g.restore();
+
+    // 排名块
+    roundRect(sx+14, y, 130, cardH, 0, b[6]);
+    g.save();
+    g.beginPath(); g.rect(sx+14, y, 130, cardH); g.clip();
+    roundRect(sx-10, y-20, 160, cardH+40, 22, b[6]);
+    g.restore();
+    text(b[0], sx+79, y+cardH/2+26, {size:76, bold:true, color:'#fff', align:'center'});
+
+    // 套餐名
+    text(b[1], sx+190, y+72, {size:46, bold:true, color:C.ink});
+    // 评分
+    text(b[3], sx+cardW-260, y+72, {size:58, bold:true, color:b[6], align:'right'});
+    // 价格
+    text(b[2], sx+cardW-60, y+72, {size:52, bold:true, color:C.ink, align:'right'});
+    // 星级 + 标签
+    text(b[4], sx+190, y+135, {size:38, color:b[6]});
+    // 品类标签
+    g.font = font(30, true);
+    const tagW = g.measureText(b[5]).width + 44;
+    roundRect(sx+190+g.measureText(b[4]).width+40, y+100, tagW, 46, 12, b[6]);
+    text(b[5], sx+190+g.measureText(b[4]).width+40+tagW/2, y+131,
+         {size:30, bold:true, color:'#fff', align:'center'});
+    // 维度
+    text(b[7], sx+cardW-60, y+135, {size:30, color:C.muted, align:'right'});
+    g.restore();
+  });
+
+  // 收尾强调（放在字幕条上方，避免重叠）
+  const p = clamp01((t-3.1)/0.7);
+  if(p>0){
+    g.save(); g.globalAlpha = easeOut(p);
+    text('标注适合人群 · 推荐程度一目了然', W/2, 860, {size:44, bold:true, color:C.red, align:'center'});
+    g.restore();
+  }
+}
+
+/* =========================================================
+   镜头 5：交互查询页  (31–42s)
+   ========================================================= */
+function scene4(t){
+  wrapText('还能生成交互查询页', W/2, 150, 1500, {size:72, bold:true, color:C.ink, align:'center'});
+
+  const px = 260, pw = 1400, ph = 600, py = 225;
+  g.save();
+  shadowOn(36, 12, 'rgba(0,0,0,.12)');
+  roundRect(px, py, pw, ph, 24, C.card);
+  shadowOff();
+  g.restore();
+
+  // 浏览器栏
+  roundRect(px, py, pw, 58, 24, '#ece8e0');
+  g.fillStyle = '#ece8e0'; g.fillRect(px, py+34, pw, 24);
+  ['#e0605a','#e0b04a','#7bc47b'].forEach((c,i)=>{
+    g.beginPath(); g.arc(px+34+i*30, py+29, 10, 0, Math.PI*2); g.fillStyle=c; g.fill();
+  });
+  text('麦门·性价比实时查询', px+140, py+40, {size:26, color:C.muted});
+
+  // 预算滑块（31–36s 区间动画）
+  const sliderY = py+120;
+  text('预算上限', px+60, sliderY-24, {size:32, bold:true, color:C.ink});
+  // 轨道
+  const trX = px+60, trW = pw-320, trY = sliderY+22, trH = 14;
+  roundRect(trX, trY, trW, trH, 7, '#e8e3da');
+  // 滑块位置：¥35 → ¥20 → ¥15
+  let frac = 1.0;
+  if(t >= 1.2) frac = 1.0 - 0.55 * easeInOut(clamp01((t-1.2)/1.4));
+  if(t >= 3.0) frac = 0.45 - 0.10 * easeInOut(clamp01((t-3.0)/1.0));
+  const knobX = trX + trW*frac;
+  roundRect(trX, trY, trW*frac, trH, 7, C.red);
+  g.beginPath(); g.arc(knobX, trY+trH/2, 24, 0, Math.PI*2); g.fillStyle='#fff'; g.fill();
+  g.lineWidth=6; g.strokeStyle=C.red; g.stroke();
+  // 数值
+  let val = '¥ 不限';
+  if(t>=1.2) val = '¥ 20';
+  if(t>=3.0) val = '¥ 15';
+  text(val, px+pw-70, sliderY+30, {size:40, bold:true, color:C.red, align:'right'});
+
+  // 场景标签（36–39s 逐个点亮）
+  const tags = ['一人食','双人餐','加班宵夜','带娃'];
+  let tx = px+60;
+  const tagY = py+230;
+  tags.forEach((tag,i)=>{
+    g.font = font(30, true);
+    const w = g.measureText(tag).width + 52;
+    let on = false;
+    if(i===0 && t>=3.2) on = true;
+    if(i===2 && t>=4.2) on = true;
+    roundRect(tx, tagY, w, 58, 16, on ? C.red : '#f0ece5');
+    text(tag, tx+w/2, tagY+39, {size:30, bold:true, color: on ? '#fff' : C.muted, align:'center'});
+    tx += w + 22;
+  });
+
+  // 结果列表（实时重排：滑到 ¥15 后换顺序）
+  const after = t >= 3.0;
+  const rows = after
+    ? [['1','双层吉士汉堡+中薯条','¥21.5','8.7',C.red],['2','麦香鱼中套餐','¥22.0','7.6',C.gold],['3','板烧鸡腿堡中套餐','¥25.0','8.3',C.orange]]
+    : [['1','双层吉士汉堡+中薯条','¥21.5','8.7',C.red],['2','板烧鸡腿堡中套餐','¥25.0','8.3',C.orange],['3','麦香鱼中套餐','¥22.0','7.6',C.gold]];
+  const ry0 = py+340, rh = 96, rgap = 18;
+  rows.forEach((r,i)=>{
+    const appear = clamp01((t-0.5-i*0.25)/0.5);
+    if(appear<=0) return;
+    // 重排时加一点位移过渡
+    let dy = 0;
+    if(after && t<3.4){ dy = (1-easeOut(clamp01((t-3.0)/0.4))) * (i===1?60:i===2?-60:0); }
+    const y = ry0 + i*(rh+rgap) + dy;
+    g.save(); g.globalAlpha = appear;
+    roundRect(px+50, y, pw-100, rh, 16, '#faf8f4');
+    g.strokeStyle = '#eee9e0'; g.lineWidth = 2;
+    roundRect(px+50, y, pw-100, rh, 16, null); g.stroke();
+    // 名次
+    roundRect(px+50, y, 76, rh, 16, r[4]);
+    text(r[0], px+88, y+rh/2+15, {size:44, bold:true, color:'#fff', align:'center'});
+    text(r[1], px+160, y+58, {size:36, bold:true, color:C.ink});
+    text(r[3], px+160, y+85, {size:26, color:C.muted});
+    text(r[2], px+pw-100, y+58, {size:40, bold:true, color:C.ink, align:'right'});
+    g.restore();
+  });
+
+  // 底部说明（放在查询页下沿之上，避免压字幕）
+  const p = clamp01((t-5.0)/0.7);
+  if(p>0){
+    g.save(); g.globalAlpha = easeOut(p);
+    text('拖滑块 / 点标签 → 榜单实时重排', W/2, 935, {size:42, bold:true, color:C.red, align:'center'});
+    g.restore();
+  }
+}
+
+/* =========================================================
+   镜头 6：功能全景  (42–53s)
+   ========================================================= */
+function scene5(t){
+  wrapText('一个榜单，六件事全包', W/2, 175, 1600, {size:72, bold:true, color:C.ink, align:'center'});
+
+  const feats = [
+    ['⚡','实时查询','每次触发都重新拉菜单与优惠券'],
+    ['🍔','套餐明细','逐项列出汉堡、薯条、饮料与数量'],
+    ['👥','人群标注','一人食 / 双人餐 / 加班宵夜 / 带娃'],
+    ['⏰','12点推送','每天中午自动送达当日最值榜单'],
+    ['🎫','优惠券优先','自动匹配可用券，算清真省多少'],
+    ['🛒','一键下单','选中即生成订单，到店/外送都支持'],
+  ];
+  const cols = 3, cw = 460, chh = 260, gx = 46, gy = 46;
+  const totalW = cw*cols + gx*(cols-1);
+  const sx = (W-totalW)/2, sy = 320;
+  feats.forEach((f,i)=>{
+    const p = clamp01((t - 0.3 - i*0.3)/0.6);
+    if(p<=0) return;
+    const e = easeOut(p);
+    const col = i % cols, row = Math.floor(i/cols);
+    const x = sx + col*(cw+gx);
+    const y = sy + row*(chh+gy) + (1-e)*40;
+    g.save(); g.globalAlpha = e;
+    shadowOn(24, 8, 'rgba(0,0,0,.08)');
+    roundRect(x, y, cw, chh, 24, C.card);
+    shadowOff();
+    text(f[0], x+50, y+96, {size:62});
+    text(f[1], x+50, y+172, {size:44, bold:true, color:C.ink});
+    wrapText(f[2], x+50, y+222, cw-90, {size:27, color:C.muted, lh:1.3});
+    g.restore();
+  });
+
+  const p = clamp01((t-2.4)/0.7);
+  if(p>0){
+    g.save(); g.globalAlpha = easeOut(p);
+    text('从查询到下单，一步到位', W/2, 845, {size:44, bold:true, color:C.red, align:'center'});
+    g.restore();
+  }
+}
+
+/* =========================================================
+   镜头 7：收尾  (53–60s)
+   ========================================================= */
+function scene6(t){
+  const p = clamp01((t-0.2)/0.85);
+  g.save(); g.globalAlpha = easeOut(p);
+  wrapText('花更少的钱', W/2, 400, 1500, {size:110, bold:true, color:C.ink, align:'center'});
+  wrapText('吃到更值的那一顿', W/2, 540, 1500, {size:110, bold:true, color:C.red, align:'center'});
+  g.restore();
+
+  const p2 = clamp01((t-1.0)/0.8);
+  if(p2>0){
+    g.save(); g.globalAlpha = easeOut(p2);
+    // GitHub 卡片
+    const cw = 900, ch = 180, cx = (W-cw)/2, cy = 650;
+    shadowOn(28, 10, 'rgba(0,0,0,.10)');
+    roundRect(cx, cy, cw, ch, 24, C.card);
+    shadowOff();
+    text('⭐', cx+88, cy+112, {size:68, align:'center'});
+    text('github.com/xiexingye/mcd-best-value', cx+165, cy+86,
+         {size:36, bold:true, color:C.ink});
+    text('项目已开源 · 欢迎查看，也欢迎点个 star', cx+165, cy+138,
+         {size:29, color:C.muted});
+    g.restore();
+  }
+
+  const p3 = clamp01((t-2.2)/0.8);
+  if(p3>0){
+    g.save(); g.globalAlpha = easeOut(p3);
+    text('麦门省钱助手 · 麦当劳程序员节创意开发大赛', W/2, 895,
+         {size:32, color:C.muted, align:'center'});
+    g.restore();
+  }
+}
+
+/* =========================================================
+   时间轴（与 audio/narration.mp3 严格对齐）
+   音频总长 44.35s，7 句语音边界由静音检测确定：
+     句1 0.000-4.307 / 句2 4.796-9.880 / 句3 10.271-13.535
+     句4 14.001-21.180 / 句5 21.634-28.866 / 句6 29.315-36.141 / 句7 36.642-43.915
+   镜头切换点取相邻静音区间的中点，保证换画面时人声正好在停顿
+   ========================================================= */
+const TIMELINE = [
+  { start:0,     dur:4.55, scene:0, subs:[[0, '每次点麦当劳，都在纠结点什么最划算？']] },
+  { start:4.55,  dur:5.53, scene:1, subs:[[0,'套餐太多挑花眼'],[1.9,'有券却不知道怎么用'],[3.7,'想吃又怕不划算']] },
+  { start:10.08, dur:3.69, scene:2, subs:[[0,'麦门省钱助手'],[1.7,'一张榜单，直接帮你拍板']] },
+  { start:13.77, dur:7.64, scene:3, subs:[[0,'实时拉取门店菜单和优惠券'],[2.5,'用四维模型给每个套餐打分'],[5.0,'标注适合人群与推荐程度']] },
+  { start:21.41, dur:7.68, scene:4, subs:[[0,'还能生成交互查询页'],[1.9,'拖预算滑块，榜单实时重排'],[3.8,'点场景标签，一秒切换视角'],[5.8,'四种排序，详情展开']] },
+  { start:29.09, dur:7.30, scene:5, subs:[[0,'实时查询 · 套餐明细 · 人群标注'],[2.4,'12 点自动推送 · 优惠券优先'],[4.9,'还有一键下单']] },
+  { start:36.39, dur:7.91, scene:6, subs:[[0,'花更少的钱，吃到更值的那一顿'],[3.0,'项目已开源，欢迎 star ⭐']] },
+];
+const TOTAL = 44.30;
+const SCENES = [scene0, scene1, scene2, scene3, scene4, scene5, scene6];
+
+/* 主渲染入口：给定时间 t 秒，画出该时刻的完整画面 */
+window.renderFrame = function(t){
+  t = Math.min(TOTAL, Math.max(0, t));
+  drawBG();
+
+  const item = TIMELINE.find(x => t >= x.start && t < x.start + x.dur) || TIMELINE[TIMELINE.length-1];
+  const local = t - item.start;
+
+  // 场景切换淡入（0.45s）
+  const fade = clamp01(local/0.45);
+  g.save();
+  g.globalAlpha = fade;
+  SCENES[item.scene](local);
+  g.restore();
+
+  // 字幕
+  let cur = '';
+  for(const [at, txt] of item.subs){ if(local >= at) cur = txt; }
+  const subFade = clamp01((local - 0.1)/0.35);
+  g.save(); g.globalAlpha = subFade; drawSubtitle(cur); g.restore();
+
+  drawProgress(t, TOTAL);
+  return true;
+};
+
+/* 就绪标记 */
+window.__RENDER_READY__ = true;
+</script>
+</body>
+</html>
