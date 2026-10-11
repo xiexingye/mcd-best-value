@@ -23,6 +23,7 @@ W, H = 1146, 717          # B站官方推荐封面尺寸
 SCALE = 2                 # 2x 输出，更清晰
 
 JOBS = [
+    ("cover_c.html", "视频封面_朴素版.png"),
     ("cover_a.html", "视频封面_白底版.png"),
     ("cover_b.html", "视频封面_红底版.png"),
 ]

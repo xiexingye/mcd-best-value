@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>封面 C · 朴素版</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1146px;height:717px;overflow:hidden}
+  body{font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;
+       background:#ffffff;position:relative}
+
+  /* 顶部：品牌名（唯一的小装饰是一个红点） */
+  .brand{position:absolute;left:64px;top:60px;display:flex;align-items:center;gap:18px;
+         font-size:30px;color:#6b6b6b;letter-spacing:2px;font-weight:400}
+  .dot{width:14px;height:14px;border-radius:50%;background:#DA291C}
+
+  /* 主标题：两行大字，黑 + 红 */
+  .l1{position:absolute;left:60px;top:192px;font-size:122px;font-weight:700;
+      color:#1f1f1f;letter-spacing:4px;line-height:1.15;white-space:nowrap}
+  .l2{position:absolute;left:58px;top:336px;font-size:122px;font-weight:700;
+      color:#DA291C;letter-spacing:4px;line-height:1.15;white-space:nowrap}
+
+  /* 底部一行说明 */
+  .foot{position:absolute;left:64px;bottom:84px;font-size:30px;color:#9a9a9a;
+        letter-spacing:2px;font-weight:400}
+</style>
+</head>
+<body>
+  <div class="brand"><span class="dot"></span>麦门省钱助手</div>
+  <div class="l1">今天吃啥</div>
+  <div class="l2">最划算？</div>
+  <div class="foot">每天 12 点 · 自动更新今日榜单</div>
+</body>
+</html>
